@@ -60,10 +60,10 @@ func setCommands(cmd *cobra.Command, out *bytes.Buffer) {
 
 func setFlags(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    flags=()\n")
-	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		fmt.Fprintf(out, "    flags+=(%q)\n", flag.Name)
+	cmd.NonInheritedFlags().VisitAll(func(flag *pflag.Flag) {
+		fmt.Fprintf(out, "    flags+=(--%q)\n", flag.Name)
 		if len(flag.Shorthand) > 0 {
-			fmt.Fprintf(out, "    flags+=(%q)\n", flag.Shorthand)
+			fmt.Fprintf(out, "    flags+=(-%q)\n", flag.Shorthand)
 		}
 	})
 
