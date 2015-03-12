@@ -46,21 +46,21 @@ func postscript(out *bytes.Buffer, name string) {
 }
 
 func setCommands(cmd *cobra.Command, out *bytes.Buffer) {
-	fmt.Fprintf(out, "commands=()\n")
+	fmt.Fprintf(out, "    commands=()\n")
 	for _, c := range cmd.Commands() {
-		fmt.Fprintf(out, "commands+=(%s)\n", c.Use)
+		fmt.Fprintf(out, "    commands+=(%s)\n", c.Use)
 	}
 	fmt.Fprintf(out, "\n")
 }
 
 func setFlags(cmd *cobra.Command, out *bytes.Buffer) {
-	fmt.Fprintf(out, "flags=()\n")
-        cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		fmt.Fprintf(out, "flags+=(%s)\n", flag.Name)
-                if len(flag.Shorthand) > 0 {
-			fmt.Fprintf(out, "flags+=(%s)\n", flag.Shorthand)
+	fmt.Fprintf(out, "    flags=()\n")
+	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
+		fmt.Fprintf(out, "    flags+=(%s)\n", flag.Name)
+		if len(flag.Shorthand) > 0 {
+			fmt.Fprintf(out, "    flags+=(%s)\n", flag.Shorthand)
 		}
-        })
+	})
 
 	fmt.Fprintf(out, "\n")
 }
@@ -72,7 +72,7 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "_%s()\n{\n", cmd.Use)
 	setCommands(cmd, out)
 	setFlags(cmd, out)
-	fmt.Fprintf(out, "__handle_reply\n")
+	fmt.Fprintf(out, "    __handle_reply\n")
 	fmt.Fprintf(out, "}\n\n")
 }
 
