@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
-	"path"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -15,7 +17,7 @@ func preamble(out *bytes.Buffer) {
 	fmt.Fprintf(out, "flags=()\n")
 	fmt.Fprintf(out, "commands=()\n\n")
 	fmt.Fprintf(out,
-`__handle_reply()
+		`__handle_reply()
 {
     case $cur in
         -*)
@@ -34,7 +36,7 @@ func preamble(out *bytes.Buffer) {
 
 func postscript(out *bytes.Buffer, name string) {
 	fmt.Fprintf(out,
-`__start()
+		`__start()
 {
     local cur prev words cword split
     _init_completion -s || return
@@ -53,7 +55,7 @@ func postscript(out *bytes.Buffer, name string) {
 func setCommands(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    commands=()\n")
 	for _, c := range cmd.Commands() {
-		fmt.Fprintf(out, "    commands+=(%s)\n", c.Use)
+		fmt.Fprintf(out, "    commands+=(%s)\n", c.Name())
 	}
 	fmt.Fprintf(out, "\n")
 }
@@ -74,12 +76,12 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	for _, c := range cmd.Commands() {
 		gen(c, out)
 	}
-	fmt.Fprintf(out, "_%s()\n{\n", cmd.Use)
+	fmt.Fprintf(out, "_%s()\n{\n", cmd.Name())
 	fmt.Fprintf(out, "    c=$((c+1))\n")
 	setCommands(cmd, out)
 	setFlags(cmd, out)
 	fmt.Fprintf(out,
-`    if [[ $c -lt $cword ]]; then
+		`    if [[ $c -lt $cword ]]; then
         completions_func=_${words[c]}
         declare -F $completions_func >/dev/null && $completions_func
 	return
@@ -93,35 +95,15 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 func GenCompletion(cmd *cobra.Command, out *bytes.Buffer) {
 	preamble(out)
 	gen(cmd, out)
-	postscript(out, cmd.Use)
-}
-
-func runHelp(cmd *cobra.Command, args []string) {
-	cmd.Help()
-}
-
-func cmd(name string) *cobra.Command {
-	return &cobra.Command{
-		Use:   name,
-		Short: "short " + name,
-		Long:  "long " + name,
-		Run:   runHelp,
-	}
+	postscript(out, cmd.Name())
 }
 
 func main() {
-	l1 := cmd(path.Base(os.Args[0]))
-	l2a := cmd("2a")
-	l2b := cmd("2b")
-	l2a1 := cmd("2a1")
-
-	l2a.AddCommand(l2a1)
-	l1.AddCommand(l2a)
-	l1.AddCommand(l2b)
+	kubectl := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
 
 	out := new(bytes.Buffer)
 
-	GenCompletion(l1, out)
+	GenCompletion(kubectl, out)
 
 	outFile, err := os.Create("/tmp/out.sh")
 	if err != nil {
