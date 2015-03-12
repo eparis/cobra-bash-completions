@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 
@@ -39,7 +40,7 @@ func postscript(out *bytes.Buffer, name string) {
     local cur prev words cword split
     _init_completion -s || return
 
-    local completions_func
+    local completions_func command_path
     local c=0
 
     _%s
@@ -74,13 +75,15 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	for _, c := range cmd.Commands() {
 		gen(c, out)
 	}
-	fmt.Fprintf(out, "_%s()\n{\n", cmd.Name())
+	commandName := cmd.CommandPath()
+	commandName = strings.Replace(commandName, " ", "_", -1)
+	fmt.Fprintf(out, "_%s()\n{\n", commandName)
 	fmt.Fprintf(out, "    c=$((c+1))\n")
 	setCommands(cmd, out)
 	setFlags(cmd, out)
 	fmt.Fprintf(out, `    if [[ $c -lt $cword ]]; then
-        completions_func=_${words[c]}
-        declare -F $completions_func >/dev/null && $completions_func
+        command_path="${command_path}_${words[c]}"
+        declare -F $command_path >/dev/null && $command_path
         return
     fi
 
