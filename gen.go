@@ -14,7 +14,8 @@ func preamble(out *bytes.Buffer) {
 	fmt.Fprintf(out, "#!/bin/bash\n\n")
 	fmt.Fprintf(out, "flags=()\n")
 	fmt.Fprintf(out, "commands=()\n\n")
-	fmt.Fprintf(out, `__handle_reply()
+	fmt.Fprintf(out,
+`__handle_reply()
 {
     case $cur in
         -*)
@@ -32,15 +33,19 @@ func preamble(out *bytes.Buffer) {
 }
 
 func postscript(out *bytes.Buffer, name string) {
-	fmt.Fprintf(out, `__start()
+	fmt.Fprintf(out,
+`__start()
 {
     local cur prev words cword split
     _init_completion -s || return
+
+    local completions_func
+    local c=0
+
     _%s
 }
 
 `, name)
-
 	fmt.Fprintf(out, "complete -F __start %s\n", name)
 	fmt.Fprintf(out, "# ex: ts=4 sw=4 et filetype=sh\n")
 }
@@ -70,8 +75,17 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 		gen(c, out)
 	}
 	fmt.Fprintf(out, "_%s()\n{\n", cmd.Use)
+	fmt.Fprintf(out, "    c=$((c+1))\n")
 	setCommands(cmd, out)
 	setFlags(cmd, out)
+	fmt.Fprintf(out,
+`    if [[ $c -lt $cword ]]; then
+        completions_func=_${words[c]}
+        declare -F $completions_func >/dev/null && $completions_func
+	return
+    fi
+
+`)
 	fmt.Fprintf(out, "    __handle_reply\n")
 	fmt.Fprintf(out, "}\n\n")
 }
