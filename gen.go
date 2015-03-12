@@ -16,8 +16,7 @@ func preamble(out *bytes.Buffer) {
 	fmt.Fprintf(out, "#!/bin/bash\n\n")
 	fmt.Fprintf(out, "flags=()\n")
 	fmt.Fprintf(out, "commands=()\n\n")
-	fmt.Fprintf(out,
-		`__handle_reply()
+	fmt.Fprintf(out, `__handle_reply()
 {
     case $cur in
         -*)
@@ -35,8 +34,7 @@ func preamble(out *bytes.Buffer) {
 }
 
 func postscript(out *bytes.Buffer, name string) {
-	fmt.Fprintf(out,
-		`__start()
+	fmt.Fprintf(out, `__start()
 {
     local cur prev words cword split
     _init_completion -s || return
@@ -55,7 +53,7 @@ func postscript(out *bytes.Buffer, name string) {
 func setCommands(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    commands=()\n")
 	for _, c := range cmd.Commands() {
-		fmt.Fprintf(out, "    commands+=(%s)\n", c.Name())
+		fmt.Fprintf(out, "    commands+=(%q)\n", c.Name())
 	}
 	fmt.Fprintf(out, "\n")
 }
@@ -63,9 +61,9 @@ func setCommands(cmd *cobra.Command, out *bytes.Buffer) {
 func setFlags(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    flags=()\n")
 	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		fmt.Fprintf(out, "    flags+=(%s)\n", flag.Name)
+		fmt.Fprintf(out, "    flags+=(%q)\n", flag.Name)
 		if len(flag.Shorthand) > 0 {
-			fmt.Fprintf(out, "    flags+=(%s)\n", flag.Shorthand)
+			fmt.Fprintf(out, "    flags+=(%q)\n", flag.Shorthand)
 		}
 	})
 
@@ -80,11 +78,10 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    c=$((c+1))\n")
 	setCommands(cmd, out)
 	setFlags(cmd, out)
-	fmt.Fprintf(out,
-		`    if [[ $c -lt $cword ]]; then
+	fmt.Fprintf(out, `    if [[ $c -lt $cword ]]; then
         completions_func=_${words[c]}
         declare -F $completions_func >/dev/null && $completions_func
-	return
+        return
     fi
 
 `)
