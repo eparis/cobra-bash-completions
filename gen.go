@@ -19,6 +19,8 @@ func preamble(out *bytes.Buffer) {
 
 flags=()
 two_word_flags=()
+flags_with_completion=()
+flags_completion=()
 commands=()
 
 __debug()
@@ -26,6 +28,18 @@ __debug()
     if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
         echo "$*" >> ${BASH_COMP_DEBUG_FILE}
     fi
+}
+
+__index_of_word()
+{
+    local w word=$1
+    shift
+    index=0
+    for w in "$@"; do
+        [[ $w = "$word" ]] && return
+        index=$((index+1))
+    done
+    index=-1
 }
 
 __contains_word()
@@ -50,12 +64,20 @@ __handle_reply()
             ;;
     esac
 
+    # check if we are handling a flag with special work handling
+    local index
+    __index_of_word "${prev}" "${flags_with_completion[@]}"
+    if [[ ${index} -ge 0 ]]; then
+        ${flags_completion[${index}]}
+        return
+    fi
+
     COMPREPLY=( $(compgen -W "${commands[*]}" -- "$cur") )
 }
 
 __handle_flags()
 {
-    __debug ${FUNCNAME}
+    if [[ $c -ge $cword ]]; then
         return
     fi
     __debug ${FUNCNAME} "c is" $c "words[c] is" ${words[c]}
