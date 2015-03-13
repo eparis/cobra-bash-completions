@@ -56,10 +56,9 @@ __handle_reply()
 __handle_flags()
 {
     __debug ${FUNCNAME}
-    if [[ $c -ge $cword ]]; then
         return
     fi
-    __debug ${FUNCNAME} "c is " $c " words[c] is" ${words[c]}
+    __debug ${FUNCNAME} "c is" $c "words[c] is" ${words[c]}
     case ${words[c]} in
         -*)
             ;;
@@ -71,10 +70,10 @@ __handle_flags()
     # skip the argument to a two word flag
     if __contains_word "${words[c]}" "${two_word_flags[@]}"; then
         c=$((c+1))
-	# if we are looking for a flags value, don't show commands
-	if [[ $c -eq $cword ]]; then
-	    commands=()
-	fi
+        # if we are looking for a flags value, don't show commands
+        if [[ $c -eq $cword ]]; then
+            commands=()
+        fi
     fi
 
     # skip the flag itseld
