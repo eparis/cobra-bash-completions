@@ -17,13 +17,6 @@ func preamble(out *bytes.Buffer) {
 	fmt.Fprintf(out, `#!/bin/bash
 
 
-flags=()
-two_word_flags=()
-flags_with_completion=()
-flags_completion=()
-commands=()
-must_have_one_flag=()
-
 __debug()
 {
     if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
@@ -78,13 +71,33 @@ __handle_reply()
         return
     fi
 
+    # we are parsing a flag and don't have a special handler, no completion
+    if [[ ${cur} != "${words[cword]}" ]]; then
+        return
+    fi
+
     local completions
-    if [ ${#must_have_one_flag[@]} -ne 0 ]; then
+    if [[ ${#must_have_one_flag[@]} -ne 0 ]]; then
         completions=("${must_have_one_flag[@]}")
+    elif [[ ${#must_have_one_noun[@]} -ne 0 ]]; then
+        completions=("${must_have_one_noun[@]}")
     else
         completions=("${commands[@]}")
     fi
     COMPREPLY=( $(compgen -W "${completions[*]}" -- "$cur") )
+}
+
+__handle_nouns()
+{
+    if [[ $c -ge $cword ]]; then
+        return
+    fi
+    __debug ${FUNCNAME} "c is" $c "words[c] is" ${words[c]}
+    if __contains_word "${words[c]}" "${must_have_one_noun[@]}"; then
+        must_have_one_noun=()
+        c=$((c+1))
+        __handle_flags
+    fi
 }
 
 __handle_flags()
@@ -97,13 +110,13 @@ __handle_flags()
         -*)
             ;;
         *)
+            __handle_nouns
             return
             ;;
     esac
 
     # if a command required a flag, and we found it, unset must_have_one_flag()
-    local flagname
-    flagname=${words[c]}
+    local flagname=${words[c]}
     # if the word contained an =
     if [[ ${words[c]} == *"="* ]]; then
         flagname=${flagname%=*} # strip everything after the =
@@ -133,19 +146,26 @@ __handle_flags()
 }
 
 func postscript(out *bytes.Buffer, name string) {
-	fmt.Fprintf(out, `__start()
-{
+	fmt.Fprintf(out, "__start_%s()\n", name)
+	fmt.Fprintf(out, `{
     local cur prev words cword split
     _init_completion -s || return
 
     local completions_func command_path
     local c=0
+    local flags=()
+    local two_word_flags=()
+    local flags_with_completion=()
+    local flags_completion=()
+    local commands=()
+    local must_have_one_flag=()
+    local must_have_one_noun=()
 
     _%s
 }
 
 `, name)
-	fmt.Fprintf(out, "complete -F __start %s\n", name)
+	fmt.Fprintf(out, "complete -F __start_%s %s\n", name, name)
 	fmt.Fprintf(out, "# ex: ts=4 sw=4 et filetype=sh\n")
 }
 
@@ -223,6 +243,18 @@ func writeRequiredFlag(cmd *cobra.Command, out *bytes.Buffer) {
 	}
 }
 
+func writeRequiredNoun(cmd *cobra.Command, out *bytes.Buffer) {
+	fmt.Fprintf(out, "    must_have_one_noun=()\n")
+	for key, value := range cmd.Annotations {
+		switch key {
+		case "bash_comp_one_required_noun":
+			for _, noun := range value {
+				fmt.Fprintf(out, "    must_have_one_noun+=(%q)\n", noun)
+			}
+		}
+	}
+}
+
 func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	for _, c := range cmd.Commands() {
 		gen(c, out)
@@ -235,6 +267,7 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	writeCommands(cmd, out)
 	writeFlags(cmd, out)
 	writeRequiredFlag(cmd, out)
+	writeRequiredNoun(cmd, out)
 	fmt.Fprintf(out, `    __handle_flags
     __debug ${FUNCNAME} $c $cword
     if [[ $c -lt $cword ]]; then
