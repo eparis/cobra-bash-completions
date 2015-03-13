@@ -132,32 +132,54 @@ func setCommands(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "\n")
 }
 
-func writeShortFlag(name string, b bool, out *bytes.Buffer) {
+func writeFlagHandler(name string, annotations map[string][]string, out *bytes.Buffer) {
+	for key, value := range annotations {
+		switch key {
+		case "bash_comp_filename_ext":
+			fmt.Fprintf(out, "    flags_with_completion+=(%q)\n", name)
+
+			ext := strings.Join(value, "|")
+			ext = "_filedir '@(" + ext + ")'"
+			fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+		}
+	}
+}
+
+func writeShortFlag(flag *pflag.Flag, out *bytes.Buffer) {
+	b := (flag.Value.Type() == "bool")
+	name := flag.Shorthand
 	format := "    "
 	if !b {
 		format += "two_word_"
 	}
 	format += "flags+=(\"-%s\")\n"
 	fmt.Fprintf(out, format, name)
+	writeFlagHandler("-"+name, flag.Annotations, out)
 }
 
-func writeFlag(name string, b bool, out *bytes.Buffer) {
+func writeFlag(flag *pflag.Flag, out *bytes.Buffer) {
+	b := (flag.Value.Type() == "bool")
+	name := flag.Name
 	format := "    flags+=(\"--%s"
 	if !b {
 		format += "="
 	}
 	format += "\")\n"
 	fmt.Fprintf(out, format, name)
+	writeFlagHandler("--"+name, flag.Annotations, out)
 }
 
 func setFlags(cmd *cobra.Command, out *bytes.Buffer) {
-	fmt.Fprintf(out, "    flags=()\n")
-	fmt.Fprintf(out, "    two_word_flags=()\n")
+	fmt.Fprintf(out, `    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+`)
 	cmd.NonInheritedFlags().VisitAll(func(flag *pflag.Flag) {
-		b := (flag.Value.Type() == "bool")
-		writeFlag(flag.Name, b, out)
+		writeFlag(flag, out)
 		if len(flag.Shorthand) > 0 {
-			writeShortFlag(flag.Shorthand, b, out)
+			writeShortFlag(flag, out)
 		}
 	})
 
