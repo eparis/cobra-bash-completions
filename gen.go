@@ -31,6 +31,21 @@ func preamble(out *bytes.Buffer) {
     COMPREPLY=( $(compgen -W "${commands[*]}" -- "$cur") )
 }
 
+__handle_flag()
+{
+    case ${cword[c]} in
+        -*)
+            ;;
+        *)
+            return
+            ;;
+    esac
+    c=$((c+1))
+    commands=()
+
+    #todo handle 2 word flags (like -f "hello.json")
+}
+
 `)
 }
 
@@ -61,11 +76,11 @@ func setCommands(cmd *cobra.Command, out *bytes.Buffer) {
 
 func writeFlag(name string, b bool, short bool, out *bytes.Buffer) {
 	format := "    flags+=(\"-"
-	if ! short {
+	if !short {
 		format += "-"
 	}
 	format += "%s"
-	if ! b && ! short {
+	if !b && !short {
 		format += "="
 	}
 	format += "\")\n"
@@ -95,10 +110,10 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    c=$((c+1))\n")
 	setCommands(cmd, out)
 	setFlags(cmd, out)
+	fmt.Fprintf(out, "    __handle_flag\n")
 	fmt.Fprintf(out, `    if [[ $c -lt $cword ]]; then
         command_path="${command_path}_${words[c]}"
-        declare -F $command_path >/dev/null && $command_path
-        return
+        declare -F $command_path >/dev/null && $command_path && return
     fi
 
 `)
