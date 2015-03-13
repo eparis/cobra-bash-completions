@@ -22,6 +22,7 @@ two_word_flags=()
 flags_with_completion=()
 flags_completion=()
 commands=()
+must_have_one_flag=()
 
 __debug()
 {
@@ -57,7 +58,12 @@ __handle_reply()
     case $cur in
         -*)
             compopt -o nospace
-            local allflags="${flags[*]} ${two_word_flags[*]}"
+            local allflags
+            if [ ${#must_have_one_flag[@]} -ne 0 ]; then
+                allflags=("${must_have_one_flag[@]}")
+            else
+                allflags=("${flags[*]} ${two_word_flags[*]}")
+            fi
             COMPREPLY=( $(compgen -W "${allflags[*]}" -- "$cur") )
             [[ $COMPREPLY == *= ]] || compopt +o nospace
             return 0;
@@ -72,7 +78,13 @@ __handle_reply()
         return
     fi
 
-    COMPREPLY=( $(compgen -W "${commands[*]}" -- "$cur") )
+    local completions
+    if [ ${#must_have_one_flag[@]} -ne 0 ]; then
+        completions=("${must_have_one_flag[@]}")
+    else
+        completions=("${commands[@]}")
+    fi
+    COMPREPLY=( $(compgen -W "${completions[*]}" -- "$cur") )
 }
 
 __handle_flags()
@@ -88,6 +100,19 @@ __handle_flags()
             return
             ;;
     esac
+
+    # if a command required a flag, and we found it, unset must_have_one_flag()
+    local flagname
+    flagname=${words[c]}
+    # if the word contained an =
+    if [[ ${words[c]} == *"="* ]]; then
+        flagname=${flagname%=*} # strip everything after the =
+        flagname="${flagname}=" # but put the = back
+    fi
+    __debug "looking for ${flagname}"
+    if __contains_word "${flagname}" "${must_have_one_flag[@]}"; then
+        must_have_one_flag=()
+    fi
 
     # skip the argument to a two word flag
     if __contains_word "${words[c]}" "${two_word_flags[@]}"; then
@@ -124,7 +149,7 @@ func postscript(out *bytes.Buffer, name string) {
 	fmt.Fprintf(out, "# ex: ts=4 sw=4 et filetype=sh\n")
 }
 
-func setCommands(cmd *cobra.Command, out *bytes.Buffer) {
+func writeCommands(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    commands=()\n")
 	for _, c := range cmd.Commands() {
 		fmt.Fprintf(out, "    commands+=(%q)\n", c.Name())
@@ -169,7 +194,7 @@ func writeFlag(flag *pflag.Flag, out *bytes.Buffer) {
 	writeFlagHandler("--"+name, flag.Annotations, out)
 }
 
-func setFlags(cmd *cobra.Command, out *bytes.Buffer) {
+func writeFlags(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, `    flags=()
     two_word_flags=()
     flags_with_completion=()
@@ -186,6 +211,18 @@ func setFlags(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "\n")
 }
 
+func writeRequiredFlag(cmd *cobra.Command, out *bytes.Buffer) {
+	fmt.Fprintf(out, "    must_have_one_flag=()\n")
+	for key, value := range cmd.Annotations {
+		switch key {
+		case "bash_comp_one_required_flag":
+			for _, flag := range value {
+				fmt.Fprintf(out, "    must_have_one_flag+=(%q)\n", flag)
+			}
+		}
+	}
+}
+
 func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	for _, c := range cmd.Commands() {
 		gen(c, out)
@@ -194,12 +231,13 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	commandName = strings.Replace(commandName, " ", "_", -1)
 	fmt.Fprintf(out, "_%s()\n{\n", commandName)
 	fmt.Fprintf(out, "    c=$((c+1))\n")
-	fmt.Fprintf(out, "    command_path=${command_path}_%s\n", cmd.Name())
-	setCommands(cmd, out)
-	setFlags(cmd, out)
-	fmt.Fprintf(out, "    __handle_flags\n")
-	fmt.Fprintf(out, "    __debug ${FUNCNAME} $c $cword\n")
-	fmt.Fprintf(out, `    if [[ $c -lt $cword ]]; then
+	fmt.Fprintf(out, "    command_path=_%s\n", commandName)
+	writeCommands(cmd, out)
+	writeFlags(cmd, out)
+	writeRequiredFlag(cmd, out)
+	fmt.Fprintf(out, `    __handle_flags
+    __debug ${FUNCNAME} $c $cword
+    if [[ $c -lt $cword ]]; then
         command_path="${command_path}_${words[c]}"
         __debug "looking for " ${command_path}
         declare -F $command_path >/dev/null && $command_path && return
