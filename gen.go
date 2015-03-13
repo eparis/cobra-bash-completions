@@ -59,12 +59,26 @@ func setCommands(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "\n")
 }
 
+func writeFlag(name string, b bool, short bool, out *bytes.Buffer) {
+	format := "    flags+=(\"-"
+	if ! short {
+		format += "-"
+	}
+	format += "%s"
+	if ! b && ! short {
+		format += "="
+	}
+	format += "\")\n"
+	fmt.Fprintf(out, format, name)
+}
+
 func setFlags(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    flags=()\n")
 	cmd.NonInheritedFlags().VisitAll(func(flag *pflag.Flag) {
-		fmt.Fprintf(out, "    flags+=(\"--%s\")\n", flag.Name)
+		b := (flag.Value.Type() == "Boolean")
+		writeFlag(flag.Name, b, false, out)
 		if len(flag.Shorthand) > 0 {
-			fmt.Fprintf(out, "    flags+=(\"-%s\")\n", flag.Shorthand)
+			writeFlag(flag.Shorthand, b, true, out)
 		}
 	})
 
