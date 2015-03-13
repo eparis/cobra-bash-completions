@@ -28,13 +28,22 @@ __debug()
     fi
 }
 
+__contains_word()
+{
+    local w word=$1; shift
+    for w in "$@"; do
+        [[ $w = "$word" ]] && return
+    done
+    return 1
+}
+
 __handle_reply()
 {
     __debug ${FUNCNAME}
     case $cur in
         -*)
             compopt -o nospace
-	    local allflags="${flags[*]} ${two_word_flags[*]}"
+            local allflags="${flags[*]} ${two_word_flags[*]}"
             COMPREPLY=( $(compgen -W "${allflags[*]}" -- "$cur") )
             [[ $COMPREPLY == *= ]] || compopt +o nospace
             return 0;
@@ -58,9 +67,18 @@ __handle_flags()
             return
             ;;
     esac
+
+    # skip the argument to a two word flag
+    if __contains_word "${words[c]}" "${two_word_flags[@]}"; then
+        c=$((c+1))
+	# if we are looking for a flags value, don't show commands
+	if [[ $c -eq $cword ]]; then
+	    commands=()
+	fi
+    fi
+
+    # skip the flag itseld
     c=$((c+1))
-    __debug ${FUNCNAME} "found flag, inc c to" ${c}
-    #todo handle 2 word flags (like -f "hello.json")
     __handle_flags
 
 }
