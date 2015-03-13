@@ -16,9 +16,18 @@ import (
 func preamble(out *bytes.Buffer) {
 	fmt.Fprintf(out, "#!/bin/bash\n\n")
 	fmt.Fprintf(out, "flags=()\n")
-	fmt.Fprintf(out, "commands=()\n\n")
-	fmt.Fprintf(out, `__handle_reply()
+	fmt.Fprintf(out, "commands=()\n")
+	fmt.Fprintf(out, `
+__debug()
 {
+    if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
+        echo "$*" >> ${BASH_COMP_DEBUG_FILE}
+    fi
+}
+
+__handle_reply()
+{
+    __debug ${FUNCNAME}
     case $cur in
         -*)
             compopt -o nospace
@@ -31,9 +40,14 @@ func preamble(out *bytes.Buffer) {
     COMPREPLY=( $(compgen -W "${commands[*]}" -- "$cur") )
 }
 
-__handle_flag()
+__handle_flags()
 {
-    case ${cword[c]} in
+    __debug ${FUNCNAME}
+    if [[ $c -ge $cword ]]; then
+        return
+    fi
+    __debug ${FUNCNAME} "c is " $c " words[c] is" ${words[c]}
+    case ${words[c]} in
         -*)
             ;;
         *)
@@ -41,9 +55,10 @@ __handle_flag()
             ;;
     esac
     c=$((c+1))
-    commands=()
-
+    __debug ${FUNCNAME} "found flag, inc c to" ${c}
     #todo handle 2 word flags (like -f "hello.json")
+    __handle_flags
+
 }
 
 `)
@@ -108,11 +123,14 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	commandName = strings.Replace(commandName, " ", "_", -1)
 	fmt.Fprintf(out, "_%s()\n{\n", commandName)
 	fmt.Fprintf(out, "    c=$((c+1))\n")
+	fmt.Fprintf(out, "    command_path=${command_path}_%s\n", cmd.Name())
 	setCommands(cmd, out)
 	setFlags(cmd, out)
-	fmt.Fprintf(out, "    __handle_flag\n")
+	fmt.Fprintf(out, "    __handle_flags\n")
+	fmt.Fprintf(out, "    __debug ${FUNCNAME} $c $cword\n")
 	fmt.Fprintf(out, `    if [[ $c -lt $cword ]]; then
         command_path="${command_path}_${words[c]}"
+        __debug "looking for " ${command_path}
         declare -F $command_path >/dev/null && $command_path && return
     fi
 
