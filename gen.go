@@ -14,10 +14,13 @@ import (
 )
 
 func preamble(out *bytes.Buffer) {
-	fmt.Fprintf(out, "#!/bin/bash\n\n")
-	fmt.Fprintf(out, "flags=()\n")
-	fmt.Fprintf(out, "commands=()\n")
-	fmt.Fprintf(out, `
+	fmt.Fprintf(out, `#!/bin/bash
+
+
+flags=()
+two_word_flags=()
+commands=()
+
 __debug()
 {
     if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
@@ -31,7 +34,8 @@ __handle_reply()
     case $cur in
         -*)
             compopt -o nospace
-            COMPREPLY=( $(compgen -W "${flags[*]}" -- "$cur") )
+	    local allflags="${flags[*]} ${two_word_flags[*]}"
+            COMPREPLY=( $(compgen -W "${allflags[*]}" -- "$cur") )
             [[ $COMPREPLY == *= ]] || compopt +o nospace
             return 0;
             ;;
