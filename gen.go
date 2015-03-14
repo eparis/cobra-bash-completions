@@ -85,6 +85,10 @@ __handle_reply()
         completions=("${commands[@]}")
     fi
     COMPREPLY=( $(compgen -W "${completions[*]}" -- "$cur") )
+
+    if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
+        declare -F __custom_func >/dev/null && __custom_func
+    fi
 }
 
 __handle_nouns()
@@ -92,7 +96,13 @@ __handle_nouns()
     if [[ $c -ge $cword ]]; then
         return
     fi
+
     __debug ${FUNCNAME} "c is" $c "words[c] is" ${words[c]}
+
+    if ! __contains_word "${words[c]}" "${commands[@]}"; then
+        last_noun="${words[c]}"
+    fi
+
     if __contains_word "${words[c]}" "${must_have_one_noun[@]}"; then
         must_have_one_noun=()
         c=$((c+1))
@@ -160,6 +170,8 @@ func postscript(out *bytes.Buffer, name string) {
     local commands=()
     local must_have_one_flag=()
     local must_have_one_noun=()
+    local last_command
+    local last_noun
 
     _%s
 }
@@ -262,6 +274,7 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 	commandName := cmd.CommandPath()
 	commandName = strings.Replace(commandName, " ", "_", -1)
 	fmt.Fprintf(out, "_%s()\n{\n", commandName)
+	fmt.Fprintf(out, "    last_command=%q\n", commandName)
 	fmt.Fprintf(out, "    c=$((c+1))\n")
 	fmt.Fprintf(out, "    command_path=_%s\n", commandName)
 	writeCommands(cmd, out)
@@ -283,6 +296,9 @@ func gen(cmd *cobra.Command, out *bytes.Buffer) {
 
 func GenCompletion(cmd *cobra.Command, out *bytes.Buffer) {
 	preamble(out)
+	if len(cmd.BashCompletionFunction) > 0 {
+		fmt.Fprintf(out, "%s\n", cmd.BashCompletionFunction)
+	}
 	gen(cmd, out)
 	postscript(out, cmd.Name())
 }
