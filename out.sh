@@ -136,11 +136,35 @@ __handle_flags()
 
 }
 
-__custom_func() {
-    if [[ "${last_command}" = "kubectl_get" && "${last_noun}" == "pods" ]]; then
-        local pods=("pod12" "pod13")
-        COMPREPLY=( $(compgen -W "${pods[*]}" -- "$cur") )
+# call kubectl get $1,
+# use the first column in compgen
+# we could use templates, but then would need a template per resource
+__kubectl_parse_get()
+{
+    local kubectl_output out
+    if kubectl_output=$(kubectl get --no-headers "$1" 2>/dev/null); then
+        out=($(echo "${kubectl_output}" | awk '{print $1}'))
+        COMPREPLY=( $( compgen -W "${out[*]}" -- "$cur" ) )
     fi
+}
+
+__kubectl_get_resource()
+{
+    __kubectl_parse_get ${last_noun}
+    if [[ $? -eq 0 ]]; then
+        return 0
+    fi
+}
+
+__custom_func() {
+    case ${last_command} in
+        kubectl_get | kubectl_describe)
+	    __kubectl_get_resource
+            return 0
+            ;;
+        *)
+            ;;
+    esac
 }
 
 _kubectl_version()
@@ -264,10 +288,17 @@ _kubectl_get()
 
     must_have_one_flag=()
     must_have_one_noun=()
-    must_have_one_noun+=("pods")
-    must_have_one_noun+=("nodes")
-    must_have_one_noun+=("services")
-    must_have_one_noun+=("replicationControllers")
+    must_have_one_noun+=("secret")
+    must_have_one_noun+=("replicationcontroller")
+    must_have_one_noun+=("endpoints")
+    must_have_one_noun+=("event")
+    must_have_one_noun+=("namespace")
+    must_have_one_noun+=("pod")
+    must_have_one_noun+=("service")
+    must_have_one_noun+=("status")
+    must_have_one_noun+=("limitrange")
+    must_have_one_noun+=("resourcequota")
+    must_have_one_noun+=("node")
     __handle_flags
     __debug ${FUNCNAME} $c $cword
     if [[ $c -lt $cword ]]; then
@@ -296,6 +327,13 @@ _kubectl_describe()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    must_have_one_noun+=("resourcequota")
+    must_have_one_noun+=("pod")
+    must_have_one_noun+=("replicationcontroller")
+    must_have_one_noun+=("service")
+    must_have_one_noun+=("minion")
+    must_have_one_noun+=("node")
+    must_have_one_noun+=("limitrange")
     __handle_flags
     __debug ${FUNCNAME} $c $cword
     if [[ $c -lt $cword ]]; then
