@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+	//"github.com/openshift/origin/pkg/cmd/cli"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -192,7 +193,7 @@ func writeCommands(cmd *cobra.Command, out *bytes.Buffer) {
 func writeFlagHandler(name string, annotations map[string][]string, out *bytes.Buffer) {
 	for key, value := range annotations {
 		switch key {
-		case "bash_comp_filename_ext":
+		case "BASH_COMP_filename_ext":
 			fmt.Fprintf(out, "    flags_with_completion+=(%q)\n", name)
 
 			ext := strings.Join(value, "|")
@@ -247,7 +248,7 @@ func writeRequiredFlag(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    must_have_one_flag=()\n")
 	for key, value := range cmd.Annotations {
 		switch key {
-		case "bash_comp_one_required_flag":
+		case "BASH_COMP_one_required_flag":
 			for _, flag := range value {
 				fmt.Fprintf(out, "    must_have_one_flag+=(%q)\n", flag)
 			}
@@ -259,7 +260,7 @@ func writeRequiredNoun(cmd *cobra.Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    must_have_one_noun=()\n")
 	for key, value := range cmd.Annotations {
 		switch key {
-		case "bash_comp_one_required_noun":
+		case "BASH_COMP_one_required_noun":
 			for _, noun := range value {
 				fmt.Fprintf(out, "    must_have_one_noun+=(%q)\n", noun)
 			}
@@ -303,14 +304,12 @@ func GenCompletion(cmd *cobra.Command, out *bytes.Buffer) {
 	postscript(out, cmd.Name())
 }
 
-func main() {
-	kubectl := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
-
+func genTest(cmd *cobra.Command, filename string) {
 	out := new(bytes.Buffer)
 
-	GenCompletion(kubectl, out)
+	GenCompletion(cmd, out)
 
-	outFile, err := os.Create("/tmp/out.sh")
+	outFile, err := os.Create(filename)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -321,4 +320,12 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func main() {
+	kubectl := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
+	genTest(kubectl, "/tmp/kubectl")
+
+	//osc := cli.NewCommandCLI("osc", "osc")
+	//genTest(osc, "/tmp/osc")
 }
